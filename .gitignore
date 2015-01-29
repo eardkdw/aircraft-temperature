@@ -1,1 +1,5 @@
 adsb-pgr-read-only*
+mds02.log
+mds02.py*
+bin/*
+*.swp
