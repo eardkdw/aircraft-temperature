@@ -4,3 +4,7 @@ IP_OF_LISTENER=$1
 socat -d -d TCP4:${IP_OF_LISTENER}:30002 pty,raw,echo=0,link=/tmp/ttyADSB &
 #then run mds02, pointing at VSP
 ./bin/mds02 -d /tmp/ttyADSB -i AVR
+
+# once up, you can run the python client, e.g.:
+#   watch python read_mds02_shared.py
+#to run repeatedly.
