@@ -8,7 +8,7 @@
 # to force a particular type for time_t (it varies with system)
 
 import sysv_ipc
-from mds02 import * #supplies Misc, Plane, P_MAX
+from mds02 import sizeof, Misc, Plane, P_MAX
 from ctypes import memmove, addressof
 
 #shared_memory_id=50626617 # integer 
@@ -16,13 +16,14 @@ from ctypes import memmove, addressof
 
 class AircraftTemp():
    TEMP_CONST=38.967854 # from http://www.csgnetwork.com/machonecalc.html
-   CELSIUS_OFFSET = 273.15 #offsel vs Kelvin
+   CELSIUS_OFFSET = 273.15 #offset vs Kelvin
   
    def __init__(self, shared_memory_id): 
       self.imem = sysv_ipc.attach(shared_memory_id)
       self.misc = Misc()
    
       self.sizeofplane=sizeof(Plane) 
+      self.planes = []
       self.unpack()
    
    #Structure of shared memory is:
@@ -34,7 +35,6 @@ class AircraftTemp():
       memmove(addressof(self.misc), misc_address, sizeof(Misc))
       
       self.P_MAX_C= self.misc.P_MAX_C
-      self.planes = []
    
       #unpack plane (0 is dummy empty record?)
       for i in range (0, self.P_MAX_C):
@@ -46,23 +46,80 @@ class AircraftTemp():
       #print memstring.find('MUSIC')
       #print memstring.find('EZY89JU')
    
-      #print 'Ident, Latitude, Longitude, Altitude / ft, T / °C'
-   def airtemp(self, plane):
-      TK = (plane.bds.tas_50/(plane.bds.mach_60*self.TEMP_CONST))**2
+   def airtemp(self, plane_index):
+      TK = (planes[plane_index].bds.tas_50/(planes[plane_index].bds.mach_60*self.TEMP_CONST))**2
       return TK - self.CELSIUS_OFFSET
 
    def position_temperature(self):
       out = []
       for i in range (0, self.P_MAX_C):
-         out.append([self.planes[i].acident, self.planes[i].lat, self.planes[i].lon, self.planes[i].alt, self.airtemp(self.planes[i])]);
+         if self.filter(i):
+            out.append([self.planes[i].acident, self.planes[i].lat, self.planes[i].lon, self.planes[i].alt, self.airtemp(i)]);
       return out
-         
+
+   def filter(self, plane_index):
+      #returns true if the indexed plane matches criteria
+      # (taken from KNMI Technical Report TR-336)
+      # 0.95< tas/ias <1.5 [-]
+      if(self.planes[plane_index].tas/self.planes[plane_index].ias < 0.95 or self.planes[plane_index].tas/self.planes[plane_index].ias > 1.5):
+         print "Fail on TAS/IAS ratio", self.planes[plane_index].tas, self.planes[plane_index].ias
+         return False;
+      #tas – ias < 5 [kt]
+      if(self.planes[plane_index].tas-self.planes[plane_index].ias > 5):
+         #print "Fail on TAS/IAS difference", self.planes[plane_index].tas, self.planes[plane_index].ias
+         return False;
+      #-30 < mhd - tan < 30 [deg]
+      if(abs(self.planes[plane_index].bds.hdg_60-self.planes[plane_index].bds.track_50) > 30):
+         print "Fail on heading/track difference", self.planes[plane_index].bds.hdg_60, self.planes[plane_index].bds.track_50, self.planes[plane_index].hdg, self.planes[plane_index].cogc
+         return False;
+      #-50 < gsp - ias < 50 [kt]
+      if(abs(self.planes[plane_index].sogc-self.planes[plane_index].ias) > 50):
+         print "Fail on ground speed / IAS difference", self.planes[plane_index].sogc, self.planes[plane_index].ias, self.planes[plane_index].bds.ias_60
+         return False;
+      #-100 < gsp - tas< 100 [kt]
+      if(abs(self.planes[plane_index].sogc-self.planes[plane_index].tas) > 100):
+         print "Fail on ground speed / TAS difference", self.planes[plane_index].sogc, self.planes[plane_index].tas, self.planes[plane_index].bds.tas_50
+         return False
+      #0 < gsp < 500 [kt]
+      if(self.planes[plane_index].sogc < 0 or self.planes[plane_index].sogc > 500):
+         return False
+      #0 < tas < 500 [kt]
+      if(self.planes[plane_index].tas < 0 or self.planes[plane_index].tas > 500):
+         print "Fail on true air speed", self.planes[plane_index].bds.tas_50
+         return False
+      #0 < ias < 500 [kt]
+      if(self.planes[plane_index].ias < 0 or self.planes[plane_index].ias > 500):
+         print "Fail on indicated air speed", self.planes[plane_index].bds.ias_60
+         return False
+      #rol < 30 [deg]
+      if(self.planes[plane_index].bds.roll_50 > 30):
+         print "Fail on roll", self.planes[plane_index].bds.roll_50
+         return False
+      #0 < mac < 1 [-]
+      if(self.planes[plane_index].bds.mach_60 < 0 or self.planes[plane_index].bds.mach_60 > 1):
+         print "Fail on Mach number", self.planes[plane_index].bds.mach_60
+         return False
+      #bar < 5000 [ft/min]
+      if(self.planes[plane_index].bds.vert_b_60 < 5000):
+         print "Fail on vertical speed, baro", self.planes[plane_index].bds.vert_b_60
+         return False
+      #ivv < 5000 [ft/min] 
+      if(self.planes[plane_index].bds.vert_i_60 < 5000): #????
+         print "Fail on vertical speed, ins", self.planes[plane_index].bds.vert_i_60
+         return False
+      #-100oC < Tair=CONST(tas/mac)2 < 50oC
+      if(self.airtemp(i) < -100 or self.airtemp(i) > 50):
+         print "Fail on temp", self.airtemp(i)
+         return False
+      #49 < lat < 54 [deg] ##CHANGE PER CURRENT LOCATION
+      #0.0 < lon < 10 [deg] ##CHANGE PER CURRENT LOCATION
+      return True
 
 with open('mds02.log') as f:
    for line in f:
       if 'SHM_ID=' in line:
-         print line
          shm_id = int(line[18:-4])
+         #print 'Ident, Latitude, Longitude, Altitude / ft, T / °C'
          at = AircraftTemp(shm_id)
          for ac in at.position_temperature():
             print '%9s, %6.4f, %6.4f, %6.0d, %4.2f' % (ac[0], ac[1], ac[2], ac[3], ac[4])
