@@ -1,7 +1,8 @@
 # make 'mds02' 'mds02pr'
 # mbr20110827
 
-ADSBPGR_DIR=adsb-pgr-read-only/trunk
+ADSBPGR=adsb-pgr-read-only
+ADSBPGR_DIR=$(ADSBPGR)/trunk
 CC=g++
 #CFLAG=-g
 
@@ -10,7 +11,7 @@ CC=g++
 all:	mds mds02.py
 
 init: 
-	svn checkout http://adsb-pgr.googlecode.com/svn/ adsb-pgr-read-only
+	svn checkout http://adsb-pgr.googlecode.com/svn/ $(ADSBPGR)
 
 mds:		
 	if [ ! -d $(ADSBPGR_DIR) ]; then $(MAKE) init; fi
@@ -24,4 +25,5 @@ mds02.py: $(ADSBPGR_DIR)/mds02.h
 	ctypesgen.py -o mds02.py faketime_t.h $(ADSBPGR_DIR)/mds02.h	
 
 clean:
-	rm -f bin/mds02 bin/mds02pr bin/lookup
+	rm -f bin/mds02 bin/mds02pr bin/lookup mds02.py* *.log
+	rm -rf $(ADSBPGR)
