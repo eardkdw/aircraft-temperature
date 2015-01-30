@@ -1,0 +1,6 @@
+#!/bin/sh
+IP_OF_LISTENER=$1
+# Connect Virtual serial port to dump1090 AVR output
+socat -d -d TCP4:${IP_OF_LISTENER}:30002 pty,raw,echo=0,link=/tmp/ttyADSB &
+#then run mds02, pointing at VSP
+./bin/mds02 -d /tmp/ttyADSB -i AVR

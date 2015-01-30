@@ -5,11 +5,15 @@ ADSBPGR_DIR=adsb-pgr-read-only/trunk
 CC=g++
 #CFLAG=-g
 
-.PHONY: mds
+.PHONY: mds init
 
-all:		mds mds02.py
+all:	mds mds02.py
+
+init: 
+	svn checkout http://adsb-pgr.googlecode.com/svn/ adsb-pgr-read-only
 
 mds:		
+	cd $(ADSBPGR_DIR) && svn update
 	$(MAKE) -C $(ADSBPGR_DIR)
 	cp $(ADSBPGR_DIR)/mds02 bin/
 	cp $(ADSBPGR_DIR)/mds02pr bin/
