@@ -10,6 +10,7 @@
 import sysv_ipc
 from mds02 import sizeof, Misc, Plane, P_MAX
 from ctypes import memmove, addressof
+from datetime import datetime
 
 import csv
 
@@ -133,6 +134,7 @@ with open('mds02.log') as f:
          at = AircraftTemp(shm)
          for idx, ac in enumerate(at.getPlanes()):
             if at.filter(idx):
-               print '%9s, %6.4f, %6.4f, %6.0d, %4.2f' % (ac.acident, ac.lat, ac.lon, ac.alt, at.airtemp(idx))
+               with open('mds02.csv','a') as c:
+                  csv.writer(c).writerow([datetime.utcnow().isoformat(),ac.acident, ac.lat, ac.lon, ac.alt, at.airtemp(idx), ac.hdg, ac.ias, ac.tas, ac.sogc, ac.bds.mach_60, ac.bds.hdg_60, ac.bds.ias_60, ac.bds.tas_50])
             
 
